@@ -10,6 +10,7 @@ def main():
     start = (100, 100, 100)
     stop = (200, 200, 200)
 
+    print(f'tile_sum: {numpy.sum(tile)}')
     obj.add_tile(tile, start, stop)
 
     obj.digest()
@@ -18,6 +19,7 @@ def main():
 
     tile = numpy.asarray(tile, dtype=numpy.uint32)
     obj.extract_tile(tile, start, stop)
+    print(f'tile_sum: {numpy.sum(tile)}')
 
     return
 

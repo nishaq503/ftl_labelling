@@ -1,3 +1,4 @@
+import gc
 import pathlib
 import typing
 
@@ -77,12 +78,10 @@ class PyPolygonSet:
                 if tile.ndim == 2:
                     tile = tile[:, :, None]
 
-                self.__polygon_set = self.__polygon_set.add_tile(tile, start, stop)
+                self.__polygon_set.add_tile(tile, start, stop)
 
         logger.debug(f'Digesting objects ...')
-        self.__polygon_set.digest()
-
-        self.__num_objects = self.__polygon_set.len()
+        self.__num_objects = self.__polygon_set.digest()
         logger.debug(f'Collected {self.num_objects} objects ...')
 
         return self
@@ -106,6 +105,9 @@ class PyPolygonSet:
                 writer[y_min:y_max, x_min:x_max, z_min:z_max] = tile
 
         # ftl_labelling.drop_polygon_set(self.__polygon_set)
+        del self.__polygon_set
+        gc.collect()
+
         self.__polygon_set = None
         return
 
