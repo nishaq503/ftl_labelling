@@ -1,76 +1,65 @@
-mod polygons;
+mod relabel;
 
-use numpy::{IntoPyArray, PyArrayDyn};
+use numpy::{PyArray3, PyReadonlyArray3};
 use pyo3::prelude::*;
 
-pub use polygons::Polygon;
-pub use polygons::PolygonSet;
-
-#[pyfunction]
-pub fn extract_tile<'py>(
-    py: Python<'py>,
-    polygon_set: &PolygonSet,
-    coordinates: (usize, usize, usize, usize, usize, usize),
-) -> &'py PyArrayDyn<usize> {
-    let tile = polygon_set._extract_tile(coordinates);
-    tile.into_pyarray(py)
+#[pyclass]
+pub struct PolygonSet {
+    polygon_set: relabel::PolygonSet,
 }
 
-/// Generates a Python-class for interfacing with Python.
+#[pymethods]
+impl PolygonSet {
+    #[new]
+    pub fn new(connectivity: u8) -> Self {
+        let connectivity = match connectivity {
+            1 => relabel::Connectivity::One,
+            2 => relabel::Connectivity::Two,
+            3 => relabel::Connectivity::Three,
+            _ => panic!("Connectivity must be 1, 2 or 3. Got {} instead.", connectivity),
+        };
+        Self { polygon_set: relabel::PolygonSet::new(connectivity) }
+    }
+
+    pub fn num_objects(&self) -> usize {
+        self.polygon_set.num_objects()
+    }
+
+    pub fn add_tile(
+        &mut self,
+        // _py: Python<'_>,
+        tile: &PyArray3<bool>,
+        start: (usize, usize, usize),
+        stop: (usize, usize, usize),
+    ) {
+        let tile = unsafe { tile.as_array() };
+        self.polygon_set.add_tile(tile, start, stop);
+    }
+
+    pub fn digest(&mut self) {
+        self.polygon_set.digest();
+    }
+
+    pub fn extract_tile(
+        &self,
+        // _py: Python<'_>,
+        tile: PyReadonlyArray3<u32>,
+        start: (usize, usize, usize),
+        stop: (usize, usize, usize),
+    ) {
+        let tile = unsafe { tile.as_array_mut() };
+        self.polygon_set.extract_tile(tile, start, stop);
+    }
+}
+
+// #[pyfunction]
+// pub fn drop_polygon_set<'py>(_py: Python<'py>, polygon_set: PolygonSet) -> PyResult<()> {
+//     Ok(())
+// }
+
 #[pymodule]
 fn ftl_labelling(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PolygonSet>()?;
-    m.add_function(wrap_pyfunction!(extract_tile, m)?)?;
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use ndarray::prelude::*;
-    use ndarray_npy::read_npy;
-    use rayon::prelude::*;
-
-    use crate::PolygonSet;
-
-    fn read_array(count: usize) -> Array3<u8> {
-        let mut path: PathBuf = std::env::current_dir().unwrap();
-        path.push("..");
-        path.push("data");
-        path.push("input_array");
-        path.push(format!("test_infile_{}.npy", count));
-        println!("reading path {:?}", path);
-
-        read_npy(path).unwrap()
-    }
-
-    #[test]
-    fn test_array() {
-        let tile_size = 1024;
-        let count = 63;
-        let data = read_array(count);
-        let polygon_set = PolygonSet::new(1);
-
-        let n_rows = data.shape()[1];
-        let n_cols = data.shape()[2];
-
-        let ys: Vec<_> = (0..n_rows).step_by(tile_size).collect();
-        let xs: Vec<_> = (0..n_cols).step_by(tile_size).collect();
-
-        ys.par_iter().for_each(|&y| {
-            let y_max = std::cmp::min(n_rows, y + tile_size);
-
-            xs.par_iter().for_each(|&x| {
-                let x_max = std::cmp::min(n_cols, x + tile_size);
-                let tile = data.slice(s![.., y..y_max, x..x_max]).into_dyn();
-                polygon_set._add_tile(tile, (0, y, x));
-            });
-        });
-
-        polygon_set.digest();
-
-        assert_eq!(polygon_set.len(), count, "wrong number of polygons");
-    }
 }

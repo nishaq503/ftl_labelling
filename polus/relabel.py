@@ -105,7 +105,7 @@ class PyPolygonSet:
                 self.__polygon_set = self.__polygon_set.extract_tile(tile, start, stop)
                 writer[y_min:y_max, x_min:x_max, z_min:z_max] = tile
 
-        ftl_labelling.drop_polygon_set(self.__polygon_set)
+        # ftl_labelling.drop_polygon_set(self.__polygon_set)
         self.__polygon_set = None
         return
 
