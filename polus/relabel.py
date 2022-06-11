@@ -13,7 +13,7 @@ from .utils import helpers
 logger = helpers.make_logger(__name__)
 
 
-class PolygonSet:
+class PyPolygonSet:
 
     def __init__(self, connectivity: int):
         if not (1 <= connectivity <= 3):
@@ -58,7 +58,7 @@ class PolygonSet:
         else:
             return numpy.uint32
 
-    def read_from(self, path: pathlib.Path) -> 'PolygonSet':
+    def read_from(self, path: pathlib.Path) -> 'PyPolygonSet':
 
         with bfio.BioReader(path) as reader:
             self.__metadata = reader.metadata
@@ -111,5 +111,5 @@ class PolygonSet:
 
 
 __all__ = [
-    'PolygonSet',
+    'PyPolygonSet',
 ]
