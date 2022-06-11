@@ -1,41 +1,76 @@
-use numpy::ndarray::{ArrayD, ArrayViewD, ArrayViewMutD};
-use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
-use pyo3::{pymodule, types::PyModule, PyResult, Python};
+mod polygons;
 
+use numpy::{IntoPyArray, PyArrayDyn};
+use pyo3::prelude::*;
+
+pub use polygons::Polygon;
+pub use polygons::PolygonSet;
+
+#[pyfunction]
+pub fn extract_tile<'py>(
+    py: Python<'py>,
+    polygon_set: &PolygonSet,
+    coordinates: (usize, usize, usize, usize, usize, usize),
+) -> &'py PyArrayDyn<usize> {
+    let tile = polygon_set._extract_tile(coordinates);
+    tile.into_pyarray(py)
+}
+
+/// Generates a Python-class for interfacing with Python.
 #[pymodule]
 fn ftl_labelling(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    // example using immutable borrows producing a new array
-    fn axpy(a: f64, x: ArrayViewD<'_, f64>, y: ArrayViewD<'_, f64>) -> ArrayD<f64> {
-        a * &x + &y
-    }
-
-    // example using a mutable borrow to modify an array in-place
-    fn mult(a: f64, mut x: ArrayViewMutD<'_, f64>) {
-        x *= a;
-    }
-
-    // wrapper of `axpy`
-    #[pyfn(m)]
-    #[pyo3(name = "axpy")]
-    fn axpy_py<'py>(
-        py: Python<'py>,
-        a: f64,
-        x: PyReadonlyArrayDyn<f64>,
-        y: PyReadonlyArrayDyn<f64>,
-    ) -> &'py PyArrayDyn<f64> {
-        let x = x.as_array();
-        let y = y.as_array();
-        let z = axpy(a, x, y);
-        z.into_pyarray(py)
-    }
-
-    // wrapper of `mult`
-    #[pyfn(m)]
-    #[pyo3(name = "mult")]
-    fn mult_py(_py: Python<'_>, a: f64, x: &PyArrayDyn<f64>) {
-        let x = unsafe { x.as_array_mut() };
-        mult(a, x);
-    }
+    m.add_class::<PolygonSet>()?;
+    m.add_function(wrap_pyfunction!(extract_tile, m)?)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use ndarray::prelude::*;
+    use ndarray_npy::read_npy;
+    use rayon::prelude::*;
+
+    use crate::PolygonSet;
+
+    fn read_array(count: usize) -> Array3<u8> {
+        let mut path: PathBuf = std::env::current_dir().unwrap();
+        path.push("..");
+        path.push("data");
+        path.push("input_array");
+        path.push(format!("test_infile_{}.npy", count));
+        println!("reading path {:?}", path);
+
+        read_npy(path).unwrap()
+    }
+
+    #[test]
+    fn test_array() {
+        let tile_size = 1024;
+        let count = 63;
+        let data = read_array(count);
+        let polygon_set = PolygonSet::new(1);
+
+        let n_rows = data.shape()[1];
+        let n_cols = data.shape()[2];
+
+        let ys: Vec<_> = (0..n_rows).step_by(tile_size).collect();
+        let xs: Vec<_> = (0..n_cols).step_by(tile_size).collect();
+
+        ys.par_iter().for_each(|&y| {
+            let y_max = std::cmp::min(n_rows, y + tile_size);
+
+            xs.par_iter().for_each(|&x| {
+                let x_max = std::cmp::min(n_cols, x + tile_size);
+                let tile = data.slice(s![.., y..y_max, x..x_max]).into_dyn();
+                polygon_set._add_tile(tile, (0, y, x));
+            });
+        });
+
+        polygon_set.digest();
+
+        assert_eq!(polygon_set.len(), count, "wrong number of polygons");
+    }
 }
