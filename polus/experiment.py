@@ -3,7 +3,7 @@ import numpy
 
 
 def main():
-    obj = ftl_labelling.PolygonSet(connectivity=1)
+    obj = ftl_labelling.ObjectSet(connectivity=1)
 
     tile = numpy.zeros(shape=(100, 100, 100), dtype=bool)
     start = (100, 100, 100)

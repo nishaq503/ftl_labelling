@@ -1,17 +1,17 @@
 mod relabel;
 
-use numpy::PyReadonlyArray3;
 use numpy::PyArray3;
+use numpy::PyReadonlyArray3;
 use pyo3::prelude::*;
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct PolygonSet {
-    polygon_set: relabel::PolygonSet,
+pub struct ObjectSet {
+    object_set: relabel::ObjectSet,
 }
 
 #[pymethods]
-impl PolygonSet {
+impl ObjectSet {
     #[new]
     pub fn new(connectivity: u8) -> Self {
         let connectivity = match connectivity {
@@ -24,12 +24,12 @@ impl PolygonSet {
             ),
         };
         Self {
-            polygon_set: relabel::PolygonSet::new(connectivity),
+            object_set: relabel::ObjectSet::new(connectivity),
         }
     }
 
     pub fn num_objects(&self) -> usize {
-        self.polygon_set.num_objects()
+        self.object_set.num_objects()
     }
 
     pub fn add_tile(
@@ -38,11 +38,11 @@ impl PolygonSet {
         start: (usize, usize, usize),
         stop: (usize, usize, usize),
     ) {
-        self.polygon_set.add_tile(tile.as_array(), start, stop);
+        self.object_set.add_tile(tile.as_array(), start, stop);
     }
 
     pub fn digest(&mut self) {
-        self.polygon_set.digest();
+        self.object_set.digest();
     }
 
     pub fn extract_tile(
@@ -52,13 +52,13 @@ impl PolygonSet {
         stop: (usize, usize, usize),
     ) {
         let tile = unsafe { tile.as_array_mut() };
-        self.polygon_set.extract_tile(tile, start, stop);
+        self.object_set.extract_tile(tile, start, stop);
     }
 }
 
 #[pymodule]
 fn ftl_labelling(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PolygonSet>()?;
+    m.add_class::<ObjectSet>()?;
 
     Ok(())
 }

@@ -14,7 +14,7 @@ from .utils import helpers
 logger = helpers.make_logger(__name__)
 
 
-class PyPolygonSet:
+class PyObjectSet:
 
     def __init__(self, connectivity: int):
         if not (1 <= connectivity <= 3):
@@ -25,7 +25,7 @@ class PyPolygonSet:
         self.__connectivity: int = connectivity
         self.__metadata: typing.Union[bfio.OmeXml.OMEXML, utils.Unset] = constants.UNSET
         self.__num_objects: typing.Union[int, utils.Unset] = constants.UNSET
-        self.__polygon_set = ftl_labelling.PolygonSet(connectivity)
+        self.__polygon_set = ftl_labelling.ObjectSet(connectivity)
 
     @property
     def connectivity(self) -> int:
@@ -49,17 +49,7 @@ class PyPolygonSet:
 
         return self.__num_objects
 
-    @property
-    def dtype(self):
-        num_objects = self.num_objects
-        if num_objects < 2 ** 8:
-            return numpy.uint8
-        elif num_objects < 2 ** 16:
-            return numpy.uint16
-        else:
-            return numpy.uint32
-
-    def read_from(self, path: pathlib.Path) -> 'PyPolygonSet':
+    def read_from(self, path: pathlib.Path) -> 'PyObjectSet':
 
         with bfio.BioReader(path) as reader:
             self.__metadata = reader.metadata
@@ -74,9 +64,10 @@ class PyPolygonSet:
                 logger.debug(f'Adding tile {i}/{len(indices)} ...')
 
                 tile = numpy.squeeze(reader[y_min:y_max, x_min:x_max, z_min:z_max, 0, 0])
-                tile: numpy.ndarray = (tile > 0)
+                tile = numpy.asarray(tile > 0, dtype=numpy.bool_)
                 if tile.ndim == 2:
                     tile = tile[:, :, None]
+                tile = tile.transpose([2, 0, 1])
 
                 self.__polygon_set.add_tile(tile, start, stop)
 
@@ -89,7 +80,7 @@ class PyPolygonSet:
     def write_to(self, path: pathlib.Path):
 
         with bfio.BioWriter(path, metadata=self.metadata, max_workers=constants.NUM_WORKERS) as writer:
-            writer.dtype = self.dtype
+            writer.dtype = numpy.uint32
 
             shape = (writer.Y, writer.X, writer.Z)
             indices = helpers.tile_writing_indices(shape)
@@ -100,11 +91,11 @@ class PyPolygonSet:
 
                 logger.debug(f'Writing tile {i}/{len(indices)} ...')
 
-                tile = numpy.zeros(shape=(y_max - y_min, x_max - x_min, z_max - z_min), dtype=int)
-                self.__polygon_set = self.__polygon_set.extract_tile(tile, start, stop)
+                tile = numpy.zeros(shape=(z_max - z_min, y_max - y_min, x_max - x_min), dtype=numpy.uint32)
+                self.__polygon_set.extract_tile(tile, start, stop)
+                tile = tile.transpose([1, 2, 0])
                 writer[y_min:y_max, x_min:x_max, z_min:z_max] = tile
 
-        # ftl_labelling.drop_polygon_set(self.__polygon_set)
         del self.__polygon_set
         gc.collect()
 
@@ -113,5 +104,5 @@ class PyPolygonSet:
 
 
 __all__ = [
-    'PyPolygonSet',
+    'PyObjectSet',
 ]

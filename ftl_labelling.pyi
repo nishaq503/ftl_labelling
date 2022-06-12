@@ -1,7 +1,7 @@
 import numpy
 
 
-class PolygonSet:
+class ObjectSet:
 
     def __init__(self, connectivity: int) -> None: ...
 
