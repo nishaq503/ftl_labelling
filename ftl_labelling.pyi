@@ -1,5 +1,6 @@
 import numpy
 
+
 class PolygonSet:
 
     def __init__(self, connectivity: int) -> None: ...
@@ -8,7 +9,7 @@ class PolygonSet:
 
     def add_tile(
         self,
-        tile: numpy.ndarray,  # bool
+        tile: numpy.ndarray[numpy.dtype[numpy.bool_]],
         start: tuple[int, int, int],
         stop: tuple[int, int, int],
     ) -> None: ...
@@ -17,7 +18,7 @@ class PolygonSet:
 
     def extract_tile(
         self,
-        tile: numpy.ndarray,  # numpy.uint32
+        tile: numpy.ndarray[numpy.dtype[numpy.uintc]],
         start: tuple[int, int, int],
         stop: tuple[int, int, int],
     ) -> None: ...
